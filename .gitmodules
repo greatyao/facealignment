@@ -1,0 +1,6 @@
+[submodule "aamlibrary"]
+	path = aamlibrary
+	url = https://github.com/greatyao/aamlibrary.git
+[submodule "asmlibrary"]
+	path = asmlibrary
+	url = https://github.com/greatyao/asmlibrary.git
