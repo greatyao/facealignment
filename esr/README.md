@@ -1,31 +1,58 @@
-# ESR
+ESR
+=========================
 
-C++ implementation of Explicit Shape Regression(ESR) algorithm.
+C++ implementation of Face Alignment by Explicit Shape Regression.
 
 ## Dataset
-We use LFPW dataset to train and test the model. Please download the data from [here](https://www.dropbox.com/s/1xl8jlyce1f4tei/lfpw.zip?dl=0) and decompress it under the `data` folder.
+We use several public dataset (LFPW, HELEN, AFW, IBUG) to train and test the model. You can download the data from [iBug Homepage](https://ibug.doc.ic.ac.uk/resources/facial-point-annotations/) and decompress it under the `data` folder.
 
 ## Pre-trained Model
-Please download the pre-trained model for the LFPW dataset and put it under the `data` folder [here](https://www.dropbox.com/s/cbl54ja2sejacgj/myModel_LFPW.txt?dl=0). 
+I have trained some models based on some dataset such as Helen, LFPW, you can download them from [BaiDu YunPan](https://pan.baidu.com/s/1gftIcsN). 
 
 ## Dependencies
-+ OpenCV2
++ OpenCV 2.x
++ CMake 2.8
 
-## How to build and Run
+## How to build
 
 ```
-#open directory
-cd PATH_TO_DIRECTORY
-
-#build project
-make all
-
-#training ESR model
-./ESRTrain
-
-#testing ESR model
-./ESRTest
+cd esr
+cmake -D CMAKE_BUILD_TYPE=Release ./
+make
 ```
+
+When the above make command completed, you will get an executable file named as esr.
+
+## How to train model
+
+```
+./esr train data/lfpw/trainset jpg pts haarcascade_frontalface_alt.xml lfpw.model
+```
+- train: esr train submodule
+- data/lfpw/trainset: the path that holds the image and shape files
+- jpg: image file format
+- pts: shape file format
+- haarcascade_frontalface_alt.xml: OpenCV haar-like face detect model
+- lfpw.model: output model file 
+
+## How to locate facial points from image
+```
+./esr live lfpw.model haarcascade_frontalface_alt.xml test.jpg
+```
+- live: esr fitting submodule
+- lfpw.model: pre-trained model file 
+- haarcascade_frontalface_alt.xml: OpenCV haar-like face detect model
+- test.jpg: input image file 
+
+## How to locate facial points from camera
+```
+./esr camera lfpw.model haarcascade_frontalface_alt.xml 0
+```
+- camera: esr fitting submodule
+- lfpw.model: pre-trained model file 
+- haarcascade_frontalface_alt.xml: OpenCV haar-like face detect model
+- 0: camera index 
+
 
 ##References
 
