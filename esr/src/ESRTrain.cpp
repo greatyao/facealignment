@@ -66,12 +66,10 @@ void loadTrainingData()
 		
 		vector<cv::Rect> faces;
 		cc.detectMultiScale(gray_image, faces);
-		if (faces.size() != 1){
+		if (faces.size() == 0) {
+			std::cout << "no face, skip!!!" << std::endl;
 		    continue;
 		}
-
-		Mat_<uchar> tempi = imread(filename.c_str(), 0);
-		trainImg.push_back(tempi);
 
 		std::string temp;
 		std::fstream fp;
@@ -94,21 +92,55 @@ void loadTrainingData()
 		}
 			
 		Mat_<double> temps(NUM_LAND_MARK, 2);
+		double center_x = 0, center_y = 0;
 		for (int j = 0; j < NUM_LAND_MARK; j++)
 		{
-		    fp >> temps(j,0) >> temps(j,1);
+		    fp >> temps(j, 0) >> temps(j, 1);
+		    center_x += temps(j, 0);
+        	center_y += temps(j, 1);
 		}
 		getline(fp, temp);
 		fp.close ();
-		trainImgShape.push_back(temps);
+		center_x /= NUM_LAND_MARK;
+    	center_y /= NUM_LAND_MARK;
 
-		ESR::Bbox tempbb;
-		tempbb.sx = faces[0].x;
-		tempbb.sy = faces[0].y;
-		tempbb.w  = faces[0].width;
-		tempbb.h  = faces[0].height;
+		double x_min, x_max, y_min, y_max;
+    	x_min = x_max = temps(0, 0);
+    	y_min = y_max = temps(0, 1);
+    	for (int j = 0; j < NUM_LAND_MARK; j++)
+		{
+		    x_min = min(x_min, temps(j, 0));
+	        x_max = max(x_max, temps(j, 0));
+	        y_min = min(y_min, temps(j, 1));
+	        y_max = max(y_max, temps(j, 1));
+	 	}
+
+	 	int k = -1;
+	 	for (int j = 0; j < faces.size(); j++) {
+	        Rect r = faces[j];
+	        if (x_max - x_min > r.width*1.5) continue;
+	        if (y_max - y_min > r.height*1.5) continue;
+	        if (abs(center_x - (r.x + r.width / 2)) > r.width / 2) continue;
+	        if (abs(center_y - (r.y + r.height / 2)) > r.height / 2) continue;
+	        k = j;
+	        break;
+    	}
+    	if(k == -1) {
+    		std::cout << "points not within face region!!!" << std::endl;
+    		continue;
+    	}
+
+    	ESR::Bbox tempbb;
+		tempbb.sx = faces[k].x;
+		tempbb.sy = faces[k].y;
+		tempbb.w  = faces[k].width;
+		tempbb.h  = faces[k].height;
 		tempbb.cx = tempbb.sx + tempbb.w/2.0;
 		tempbb.cy = tempbb.sy + tempbb.h/2.0;
+
+		Mat_<uchar> tempi = imread(filename.c_str(), 0);
+		trainImg.push_back(tempi);
+		trainImgShape.push_back(temps);
 		trainImgBbox.push_back(tempbb);
     }
 
