@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 	else if(strcmp(argv[1], "camera") == 0)
 		return camera_main(argc-2, argv+2);
 	else
-		std::cout << "Unsupport command " << argv[2] << std::endl;
+		std::cout << "Unsupport command " << argv[1] << std::endl;
 
 	return 0;
 }
