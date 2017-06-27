@@ -1,13 +1,13 @@
+#include <iostream>
+#include <fstream>
 #include <cstdio>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
-#include "common.hpp"
 
 using namespace cv;
 using namespace std;
-using namespace lbf;
 
-CascadeClassifier cc("../model/haarcascade_frontalface_alt.xml");
+CascadeClassifier cc;
 
 Rect getBBox(Mat &img, Mat_<double> &shape) {
     vector<Rect> rects;
@@ -39,11 +39,9 @@ Rect getBBox(Mat &img, Mat_<double> &shape) {
     return Rect(-1, -1, -1, -1);
 }
 
-void genTxt(const string &inTxt, const string &outTxt) {
-    Config &config = Config::GetInstance();
-    int landmark_n = config.landmark_n;
-    Mat_<double> gt_shape(landmark_n, 2);
+int NUM_LAND_MARK = 0;
 
+void genTxt(const string &inTxt, const string &outTxt) {
     FILE *inFile = fopen(inTxt.c_str(), "r");
     FILE *outFile = fopen(outTxt.c_str(), "w");
     assert(inFile && outFile);
@@ -54,21 +52,32 @@ void genTxt(const string &inTxt, const string &outTxt) {
     int N = 0;
     while (fgets(line, sizeof(line), inFile)) {
         string img_path(line, strlen(line) - 1);
-
-        LOG("Handle %s", img_path.c_str());
-
+        printf("Handle image %s\n", img_path.c_str());
         string pts = img_path.substr(0, img_path.find_last_of(".")) + ".pts";
-        FILE *tmp = fopen(pts.c_str(), "r");
-        if(!tmp) continue;
-        assert(tmp);
-        fgets(line, sizeof(line), tmp);
-        fgets(line, sizeof(line), tmp);
-        fgets(line, sizeof(line), tmp);
-        for (int i = 0; i < landmark_n; i++) {
-            fscanf(tmp, "%lf", &gt_shape(i, 0));
-            fscanf(tmp, "%lf", &gt_shape(i, 1));
+        printf("Handle point %s\n", pts.c_str());
+        fstream fp;
+        fp.open(pts.c_str(), ios::in);
+        if(!fp.is_open()) continue;
+	      string temp;
+        getline(fp, temp);
+      	getline(fp, temp, ' ');
+      	getline(fp, temp);
+      	int NbOfPoints = atoi(temp.c_str());
+      	printf("Handle point %d\n", NbOfPoints);
+      	getline(fp, temp);
+      	if(NUM_LAND_MARK == 0) {
+          NUM_LAND_MARK = NbOfPoints;
+      	} else if(NUM_LAND_MARK != NbOfPoints) {
+      		printf("ERROR: Points data does NOT has the same size!\n%s has %d points, but other has %d points\n",
+      			pts.c_str(), NbOfPoints, NUM_LAND_MARK);
+      		exit(0);
+      	}
+
+        Mat_<double> gt_shape(NUM_LAND_MARK, 2);
+        for (int i = 0; i < NUM_LAND_MARK; i++) {
+            fp >> gt_shape(i, 0) >> gt_shape(i, 1);
         }
-        fclose(tmp);
+        fp.close();
 
         Mat img = imread(img_path, CV_LOAD_IMAGE_GRAYSCALE);
         Rect bbox = getBBox(img, gt_shape);
@@ -77,24 +86,29 @@ void genTxt(const string &inTxt, const string &outTxt) {
             N++;
             sprintf(buff, "%s %d %d %d %d", img_path.c_str(), bbox.x, bbox.y, bbox.width, bbox.height);
             out_string += buff;
-            for (int i = 0; i < landmark_n; i++) {
+            for (int i = 0; i < NUM_LAND_MARK; i++) {
                 sprintf(buff, " %lf %lf", gt_shape(i, 0), gt_shape(i, 1));
                 out_string += buff;
             }
             out_string += "\n";
         }
     }
-    fprintf(outFile, "%d\n%s", N, out_string.c_str());
+    fprintf(outFile, "%d %d\n%s", N, NUM_LAND_MARK, out_string.c_str());
 
     fclose(inFile);
     fclose(outFile);
 }
 
-int prepare(void) {
-    Config &params = Config::GetInstance();
-    string txt = params.dataset + "/Path_Images_train.txt";
-    genTxt(txt, params.dataset + "/train.txt");
-    //txt = params.dataset + "/Path_Images_test.txt";
-    //genTxt(txt, params.dataset + "/test.txt");
+int prepare(int argc, char* argv[]) {
+    if(argc != 3) {
+        printf("prepare path_images_train.txt cascade_file output.txt\n");
+	return -1;
+    }
+    if(!cc.load(argv[1])) {
+	printf("failed to load cascade file %s\n", argv[1]);
+	return -1;
+    }
+
+    genTxt(argv[0], argv[2]);
     return 0;
 }

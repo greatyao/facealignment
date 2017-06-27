@@ -11,21 +11,24 @@ using namespace std;
 using namespace lbf;
 
 // dirty but works
-void parseTxt(string &txt, vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBox> &bboxes);
+void parseTxt(const string &txt, vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBox> &bboxes);
 
-int test(void) {
+int test(int argc, char* argv[]) {
+    if(argc != 2) {
+      printf("test model_file test.txt\n");
+      return -1;
+    }
+
     Config &config = Config::GetInstance();
-
     LbfCascador lbf_cascador;
-    FILE *fd = fopen(config.saved_file_name.c_str(), "rb");
+    FILE *fd = fopen(argv[0], "rb");
     lbf_cascador.Read(fd);
     fclose(fd);
 
-    LOG("Load test data from %s", config.dataset.c_str());
-    string txt = config.dataset + "/test.txt";
+    LOG("Load test data from %s", argv[1]);
     vector<Mat> imgs, gt_shapes;
     vector<BBox> bboxes;
-    parseTxt(txt, imgs, gt_shapes, bboxes);
+    parseTxt(argv[1], imgs, gt_shapes, bboxes);
 
     int N = imgs.size();
     lbf_cascador.Test(imgs, gt_shapes, bboxes);
@@ -33,19 +36,24 @@ int test(void) {
     return 0;
 }
 
-int run(void) {
+int run(int argc, char* argv[]) {
+    if(argc != 2) {
+      printf("run model_file test.txt\n");
+      return -1;
+    }
+
     Config &config = Config::GetInstance();
-    FILE *fd = fopen((config.dataset + "/test.txt").c_str(), "r");
+    FILE *fd = fopen(argv[1], "r");
     assert(fd);
     int N;
-    int landmark_n = config.landmark_n;
-    fscanf(fd, "%d", &N);
+    int landmark_n;
+    fscanf(fd, "%d%d", &N, &landmark_n);
     char img_path[256];
     double bbox[4];
     vector<double> x(landmark_n), y(landmark_n);
 
     LbfCascador lbf_cascador;
-    FILE *model = fopen(config.saved_file_name.c_str(), "rb");
+    FILE *model = fopen(argv[0], "rb");
     lbf_cascador.Read(model);
     fclose(model);
 
@@ -64,19 +72,14 @@ int run(void) {
         x_max = *max_element(x.begin(), x.end());
         y_min = *min_element(y.begin(), y.end());
         y_max = *max_element(y.begin(), y.end());
-	printf("1. %g %g %g %g\n", bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]);
-        printf("2. %g %g %g %g\n", x_min, y_min, x_max, y_max);
         x_min = max(0., x_min - bbox[2] / 2);
         x_max = min(img.cols - 1., x_max + bbox[2] / 2);
         y_min = max(0., y_min - bbox[3] / 2);
         y_max = min(img.rows - 1., y_max + bbox[3] / 2);
-	printf("3. %g %g %g %g\n", x_min, y_min, x_max, y_max);
         double x_, y_, w_, h_;
         x_ = x_min; y_ = y_min;
         w_ = x_max - x_min; h_ = y_max - y_min;
         BBox bbox_(bbox[0] - x_, bbox[1] - y_, bbox[2], bbox[3]);
-        printf("4. %g %g %g %g\n", x_, y_, w_, h_);
-        printf("5. %g %g %g %g\n", bbox[0] - x_, bbox[1] - y_, bbox[2], bbox[3]);
         Rect roi(x_, y_, w_, h_);
         img = img(roi).clone();
 
@@ -95,7 +98,7 @@ int run(void) {
     return 0;
 }
 
-int live(int argc, const char* argv[]) {
+int live(int argc, char* argv[]) {
     if (argc != 3) {
         fprintf(stderr, "model_name cascade_name image_name\n");
         return -1;
@@ -143,7 +146,6 @@ int live(int argc, const char* argv[]) {
     t = (double)cvGetTickCount() - t;
     printf("detection time = %g ms\n", t/((double)cvGetTickFrequency()*1000.) );
 
-    cvtColor(img, gray, CV_BGR2GRAY);    
     for(vector<Rect>::const_iterator r = faces.begin(); r != faces.end(); r++){
         Mat shape;
         bbox[0] = r->x*scale;
@@ -170,7 +172,7 @@ int live(int argc, const char* argv[]) {
     return 0;
 }
 
-int camera(int argc, const char* argv[]) {
+int camera(int argc, char* argv[]) {
     if (argc != 3) {
         fprintf(stderr, "model_name cascade_name camera_index\n");
         return -1;
@@ -212,7 +214,7 @@ int camera(int argc, const char* argv[]) {
         Mat gray, smallImg;
         double t;
    	cvtColor(frame, gray, CV_BGR2GRAY);
- 
+
     	smallImg = Mat(cvRound (frame.rows/scale), cvRound(frame.cols/scale), CV_8UC1 );
     	resize(gray, smallImg, smallImg.size(), 0, 0, INTER_LINEAR);
     	equalizeHist(smallImg, smallImg);
@@ -222,7 +224,7 @@ int camera(int argc, const char* argv[]) {
     		Size(30, 30) );
     	t = (double)cvGetTickCount() - t;
     	printf("detection time = %g ms\n", t/((double)cvGetTickFrequency()*1000.) );
-        if(faces.size() == 0) 
+        if(faces.size() == 0)
             continue;
 
     	for(vector<Rect>::iterator r = faces.begin(); r != faces.end(); r++){

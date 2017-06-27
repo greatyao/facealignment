@@ -10,13 +10,14 @@ using namespace cv;
 using namespace std;
 using namespace lbf;
 
-void parseTxt(string &txt, vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBox> &bboxes) {
+void parseTxt(const string &txt, vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBox> &bboxes) {
     Config &config = Config::GetInstance();
     FILE *fd = fopen(txt.c_str(), "r");
     assert(fd);
     int N;
-    int landmark_n = config.landmark_n;
+    int landmark_n;
     fscanf(fd, "%d", &N);
+    fscanf(fd, "%d", &landmark_n);
     imgs.resize(N);
     gt_shapes.resize(N);
     bboxes.resize(N);
@@ -57,106 +58,17 @@ void parseTxt(string &txt, vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBo
     fclose(fd);
 }
 
-
-void data_augmentation(vector<Mat> &imgs, vector<Mat> &gt_shapes, vector<BBox> &bboxes) {
-    int N = imgs.size();
-    imgs.reserve(2 * N);
-    gt_shapes.reserve(2 * N);
-    bboxes.reserve(2 * N);
-    for (int i = 0; i < N; i++) {
-        Mat img_flipped;
-        Mat_<double> gt_shape_flipped(gt_shapes[i].size());
-        flip(imgs[i], img_flipped, 1);
-        int w = img_flipped.cols - 1;
-        int h = img_flipped.rows - 1;
-        for (int k = 0; k < gt_shapes[i].rows; k++) {
-            gt_shape_flipped(k, 0) = w - gt_shapes[i].at<double>(k, 0);
-            gt_shape_flipped(k, 1) = gt_shapes[i].at<double>(k, 1);
-        }
-        int x_b, y_b, w_b, h_b;
-        x_b = w - bboxes[i].x - bboxes[i].width;
-        y_b = bboxes[i].y;
-        w_b = bboxes[i].width;
-        h_b = bboxes[i].height;
-        BBox bbox_flipped(x_b, y_b, w_b, h_b);
-
-        imgs.push_back(img_flipped);
-        gt_shapes.push_back(gt_shape_flipped);
-        bboxes.push_back(bbox_flipped);
-
-        //Mat tmp = drawShapeInImage(imgs[i], gt_shapes[i], bboxes[i]);
-        //imshow("img", tmp);
-        //waitKey(0);
-        //cout << w << endl;
-        //cout << gt_shapes[i] << endl;
-        //cout << gt_shape_flipped << endl;
-        //tmp = drawShapeInImage(img_flipped, gt_shape_flipped, bbox_flipped);
-        //imshow("img", tmp);
-        //waitKey(0);
+int train(int argc, char* argv[], int start_from) {
+    if(argc != 2) {
+        printf("train train.txt model_file\n");
+        return -1;
     }
-    // landmark id need swap
     Config &config = Config::GetInstance();
-
-#define SWAP(shape, i, j) do { \
-        double tmp = shape.at<double>(i-1, 0); \
-        shape.at<double>(i-1, 0) = shape.at<double>(j-1, 0); \
-        shape.at<double>(j-1, 0) = tmp; \
-        tmp =  shape.at<double>(i-1, 1); \
-        shape.at<double>(i-1, 1) = shape.at<double>(j-1, 1); \
-        shape.at<double>(j-1, 1) = tmp; \
-    } while(0)
-/*
-    if (config.landmark_n == 29) {
-        for (int i = N; i < gt_shapes.size(); i++) {
-            SWAP(gt_shapes[i], 1, 2);
-            SWAP(gt_shapes[i], 3, 4);
-            SWAP(gt_shapes[i], 5, 7);
-            SWAP(gt_shapes[i], 6, 8);
-            SWAP(gt_shapes[i], 13, 15);
-            SWAP(gt_shapes[i], 9, 10);
-            SWAP(gt_shapes[i], 11, 12);
-            SWAP(gt_shapes[i], 17, 18);
-            SWAP(gt_shapes[i], 14, 16);
-            SWAP(gt_shapes[i], 19, 20);
-            SWAP(gt_shapes[i], 23, 24);
-        }
-    }
-    else if (config.landmark_n == 68) {
-        for (int i = N; i < gt_shapes.size(); i++) {
-            for (int k = 1; k <= 8; k++) SWAP(gt_shapes[i], k, 18 - k);
-            for (int k = 18; k <= 22; k++) SWAP(gt_shapes[i], k, 45 - k);
-            for (int k = 37; k <= 40; k++) SWAP(gt_shapes[i], k, 83 - k);
-            SWAP(gt_shapes[i], 42, 47);
-            SWAP(gt_shapes[i], 41, 48);
-            SWAP(gt_shapes[i], 32, 36);
-            SWAP(gt_shapes[i], 33, 35);
-            for (int k = 49; k <= 51; k++) SWAP(gt_shapes[i], k, 104 - k);
-            SWAP(gt_shapes[i], 60, 56);
-            SWAP(gt_shapes[i], 59, 57);
-            SWAP(gt_shapes[i], 61, 65);
-            SWAP(gt_shapes[i], 62, 64);
-            SWAP(gt_shapes[i], 68, 66);
-        }
-    }
-    else {
-        LOG("Wrang Landmark_n, it must be 29 or 68");
-    }
-*/
-#undef SWAP
-
-}
-
-
-int train(int start_from) {
-    Config &config = Config::GetInstance();
-    LOG("Load train data from %s", config.dataset.c_str());
-    string txt = config.dataset + "/train.txt";
+    LOG("Load train data from %s", argv[0]);
     vector<Mat> imgs_, gt_shapes_;
     vector<BBox> bboxes_;
-    parseTxt(txt, imgs_, gt_shapes_, bboxes_);
+    parseTxt(argv[0], imgs_, gt_shapes_, bboxes_);
 
-    //LOG("Data Augmentation");
-    //data_augmentation(imgs_, gt_shapes_, bboxes_);
     Mat mean_shape = getMeanShape(gt_shapes_, bboxes_);
 
     int N = imgs_.size();
@@ -201,7 +113,7 @@ int train(int start_from) {
     TIMER_END
 
     // Save
-    FILE *fd = fopen(config.saved_file_name.c_str(), "wb");
+    FILE *fd = fopen(argv[1], "wb");
     assert(fd);
     lbf_cascador.Write(fd);
     fclose(fd);
